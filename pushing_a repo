@@ -1,0 +1,34 @@
+git remote set-url origin https://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@github.com/sesiii/data_analytics
+
+git remote add origin https://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@github.com/sesiii/Networks_Lab
+
+
+git push -u origin main
+
+new_token:: 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
+
+
+
+
+sudo date -s "$(wget -qSO- --max-redirect=0 google.com 2>&1 | grep Date: | cut -d' ' -f5-8)Z"
+
+
+
+
+How to create a new github repo on my machine
+git init
+git clone "url"
+git config --global --add safe.directory 'Repo path on my machine'
+
+git status
+git add .
+
+git remote -v
+git remote add origin https://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@github.com/sesiii/Repo name
+git remote -v
+
+
+git remote -v //checking 
+git branch //master
+git push origin master
+
