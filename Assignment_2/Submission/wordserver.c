@@ -1,4 +1,7 @@
-// wordserver.c
+//Assignment 2 Submission
+//Name: Dadi Sasank Kumar
+//Roll number: 22CS10020
+//Link of the pcap file: https://drive.google.com/file/d/1xHfJ-ncZlSxzedsbVnj_decCiA74deIN/view?usp=sharing
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,8 +25,8 @@ int main() {
     }
 
     // Clear servaddr
-    memset(&servaddr, 0, sizeof(servaddr));
-    memset(&cliaddr, 0, sizeof(cliaddr));
+    bzero(&servaddr, sizeof(servaddr));
+    bzero(&cliaddr, sizeof(cliaddr));
 
     // Set server address
     servaddr.sin_family = AF_INET;
