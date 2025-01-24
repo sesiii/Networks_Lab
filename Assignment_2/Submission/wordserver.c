@@ -8,7 +8,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-#define PORT 1020
+#define PORT 5001
 #define MAXLINE 1000
 
 int main() {
