@@ -22,7 +22,7 @@ done
 # Compile the client if needed
 if [ ! -f "./client" ]; then
     echo "Compiling client..."
-    gcc -o client client.c
+    gcc -o client retrieveencfileclient.c
     if [ $? -ne 0 ]; then
         echo "Compilation failed!"
         exit 1
