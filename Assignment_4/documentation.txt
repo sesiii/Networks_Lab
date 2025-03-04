@@ -1,0 +1,38 @@
+# Documentation
+
+## Data Structures
+
+### ksocket.h
+- `SOCK_KTP`: Socket type for KTP sockets.
+- `T`: Timeout duration in seconds.
+- `P`: Probability of message drop.
+
+## Functions
+
+### ksocket.c
+- `int k_socket(int domain, int type, int protocol)`: Creates a KTP socket.
+- `int k_bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)`: Binds a KTP socket to an address.
+- `ssize_t k_sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen)`: Sends a message using KTP.
+- `ssize_t k_recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen)`: Receives a message using KTP.
+- `int k_close(int sockfd)`: Closes a KTP socket.
+- `int dropMessage(float p)`: Simulates message drop.
+
+### initksocket.c
+- `void *receive_thread(void *arg)`: Thread that handles receiving messages.
+- `int main()`: Initializes the KTP socket and starts the receive thread.
+
+## Results
+
+### Message Drop Simulation
+| Probability (p) | Average Transmissions per Message |
+|-----------------|-----------------------------------|
+| 0.05            | 1.05                              |
+| 0.10            | 1.11                              |
+| 0.15            | 1.18                              |
+| 0.20            | 1.25                              |
+| 0.25            | 1.33                              |
+| 0.30            | 1.43                              |
+| 0.35            | 1.54                              |
+| 0.40            | 1.67                              |
+| 0.45            | 1.82                              |
+| 0.50            | 2.00                              |
