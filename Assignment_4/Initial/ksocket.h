@@ -17,6 +17,11 @@
 #define WINDOW_SIZE 10          // Window size for flow control
 #define SEQ_NUM_BITS 8          // Sequence number is 8 bits (0-255)
 
+// Error Codes
+#define ENOSPACE -1             // No space in shared memory
+#define ENOTBOUND -2            // Socket not bound
+#define ENOMESSAGE -3           // No message available in buffer
+
 // KTP Socket Structure
 typedef struct {
     int is_free;                // 1 if free, 0 if allotted
@@ -38,22 +43,20 @@ typedef struct {
     KTP_Socket sockets[MAX_SOCKETS]; // Array of KTP sockets
 } SharedMemory;
 
-// Data Message Format
-typedef struct {
-    uint8_t seq_num;            // Sequence number (8 bits)
-    char payload[MESSAGE_SIZE]; // Payload (512 bytes)
-} DataMessage;
-
-// ACK Message Format
-typedef struct {
-    uint8_t ack_num;            // Last in-order sequence number received
-    int rwnd_size;              // Updated receiver window size
-} AckMessage;
+// Declare shm as an extern variable
+extern SharedMemory* shm;
 
 // Function Prototypes
 int init_shared_memory();
 SharedMemory* attach_shared_memory(int shmid);
 void detach_shared_memory(SharedMemory* shm);
 void cleanup_shared_memory(int shmid);
+
+// Core KTP Functions
+int k_socket();
+int k_bind(int sockfd, const char* src_ip, int src_port, const char* dest_ip, int dest_port);
+int k_sendto(int sockfd, const void* buf, size_t len, int flags);
+int k_recvfrom(int sockfd, void* buf, size_t len, int flags);
+int k_close(int sockfd);
 
 #endif // KSOCKET_H

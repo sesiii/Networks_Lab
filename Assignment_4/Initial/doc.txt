@@ -1,0 +1,3 @@
+./initsocket
+./user2 <id>
+./user1 <id>
