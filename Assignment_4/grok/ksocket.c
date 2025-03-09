@@ -8,12 +8,11 @@
 
 SharedMemory *shm = NULL;
 
-
-int dropMessage() {
+int dropMessage(float probability) {
     double r = (double)rand() / RAND_MAX;
-    int dropped = (r < DROP_PROBABILITY);
+    int dropped = (r < probability);
     if (dropped) {
-        printf("[dropMessage] Packet dropped (probability=%.2f)\n", DROP_PROBABILITY);
+        printf("[dropMessage] Packet dropped (probability=%.2f)\n", probability);
     }
     return dropped;
 }
@@ -45,9 +44,43 @@ int init_shared_memory() {
         memset(shm->sockets[i].swnd.timestamps, 0, sizeof(time_t) * WINDOW_SIZE);
         memset(shm->sockets[i].rwnd.messages, 0, sizeof(KTP_Message) * WINDOW_SIZE);
     }
+    shm->drop_probability = P; // Use default from header
     printf("[init_shared_memory] Shared memory initialized with ID: %d\n", shmid);
     return shmid;
 }
+
+// int init_shared_memory() {
+//     printf("[init_shared_memory] Initializing shared memory...\n");
+//     int shmid = shmget(IPC_PRIVATE, sizeof(SharedMemory), 0666 | IPC_CREAT);
+//     if (shmid == -1) {
+//         perror("[init_shared_memory] shmget failed");
+//         return -1;
+//     }
+//     shm = attach_shared_memory(shmid);
+//     if (shm == NULL) return -1;
+
+//     for (int i = 0; i < MAX_SOCKETS; i++) {
+//         shm->sockets[i].is_free = 1;
+//         shm->sockets[i].process_id = 0;
+//         shm->sockets[i].sock_id = -1;
+//         shm->sockets[i].send_count = 0;
+//         shm->sockets[i].recv_count = 0;
+//         shm->sockets[i].swnd.base = 0;
+//         shm->sockets[i].swnd.next_seq = 0;
+//         shm->sockets[i].swnd.size = 0;
+//         shm->sockets[i].rwnd.base = 0;
+//         shm->sockets[i].rwnd.size = 0;
+//         shm->sockets[i].rwnd.rwnd = WINDOW_SIZE;
+//         memset(shm->sockets[i].send_buffer, 0, sizeof(KTP_Message) * WINDOW_SIZE);
+//         memset(shm->sockets[i].recv_buffer, 0, sizeof(KTP_Message) * WINDOW_SIZE);
+//         memset(shm->sockets[i].swnd.messages, 0, sizeof(KTP_Message) * WINDOW_SIZE);
+//         memset(shm->sockets[i].swnd.timestamps, 0, sizeof(time_t) * WINDOW_SIZE);
+//         memset(shm->sockets[i].rwnd.messages, 0, sizeof(KTP_Message) * WINDOW_SIZE);
+//     }
+//     shm->drop_probability = 0.1; 
+//     printf("[init_shared_memory] Shared memory initialized with ID: %d\n", shmid);
+//     return shmid;
+// }
 
 SharedMemory* attach_shared_memory(int shmid) {
     SharedMemory *ptr = (SharedMemory *)shmat(shmid, NULL, 0);
@@ -142,32 +175,6 @@ int k_sendto(int sockfd, const void* buf, size_t len, int flags) {
     return (int)copy_len;
 }
 
-
-
-// int k_recvfrom(int sockfd, void* buf, size_t len, int flags) {
-//     printf("[k_recvfrom] Receiving on socket %d...\n", sockfd);
-//     if (shm == NULL || sockfd < 0 || sockfd >= MAX_SOCKETS || shm->sockets[sockfd].is_free) {
-//         fprintf(stderr, "[k_recvfrom] Invalid socket\n");
-//         return ENOTBOUND;
-//     }
-//     if (shm->sockets[sockfd].recv_count > 0) {
-//         KTP_Message msg = shm->sockets[sockfd].recv_buffer[0];
-//         int msg_len = strnlen(msg.payload, MESSAGE_SIZE);
-//         if (msg_len > (int)len) msg_len = (int)len;
-//         memcpy(buf, msg.payload, msg_len);
-//         for (int i = 1; i < shm->sockets[sockfd].recv_count; i++) {
-//             shm->sockets[sockfd].recv_buffer[i - 1] = shm->sockets[sockfd].recv_buffer[i];
-//         }
-//         shm->sockets[sockfd].recv_count--;
-//         // Update rwnd.rwnd to reflect available space
-//         shm->sockets[sockfd].rwnd.rwnd = WINDOW_SIZE - shm->sockets[sockfd].recv_count;
-//         printf("[k_recvfrom] Got seq=%d: %s, rwnd=%d\n", msg.seq_num, (char*)buf, shm->sockets[sockfd].rwnd.rwnd);
-//         return msg_len;
-//     }
-//     printf("[k_recvfrom] No message available\n");
-//     return ENOMESSAGE;
-// }
-
 int k_recvfrom(int sockfd, void* buf, size_t len, int flags) {
     printf("[k_recvfrom] Receiving on socket %d...\n", sockfd);
     if (shm == NULL || sockfd < 0 || sockfd >= MAX_SOCKETS || shm->sockets[sockfd].is_free) {
@@ -205,6 +212,213 @@ int k_close(int sockfd) {
     printf("[k_close] Closed socket %d\n", sockfd);
     return 0;
 }
+// void *thread_r(void *arg) {
+//     ThreadArgs *args = (ThreadArgs *)arg;
+//     int shmid = args->shmid;
+//     printf("[thread_r] Starting with shmid=%d...\n", shmid);
+//     shm = attach_shared_memory(shmid);
+//     if (shm == NULL) return NULL;
+
+//     int socks[MAX_SOCKETS];
+//     for (int i = 0; i < MAX_SOCKETS; i++) {
+//         socks[i] = socket(AF_INET, SOCK_DGRAM, 0);
+//         if (socks[i] < 0) {
+//             perror("[thread_r] Socket creation failed");
+//             detach_shared_memory(shm);
+//             return NULL;
+//         }
+//         struct sockaddr_in addr;
+//         addr.sin_family = AF_INET;
+//         addr.sin_port = htons(i == 0 ? PORT_USER1 : PORT_USER2);
+//         inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+//         if (bind(socks[i], (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+//             perror("[thread_r] Bind failed");
+//             detach_shared_memory(shm);
+//             return NULL;
+//         }
+//         shm->sockets[i].sock_id = socks[i];
+//         printf("[thread_r] Bound sock_%d=%d to 127.0.0.1:%d\n", i, socks[i], ntohs(addr.sin_port));
+//     }
+
+//     fd_set readfds;
+//     struct timeval tv;
+//     while (1) {
+//         FD_ZERO(&readfds);
+//         int max_fd = 0;
+//         for (int i = 0; i < MAX_SOCKETS; i++) {
+//             if (!shm->sockets[i].is_free) {
+//                 FD_SET(socks[i], &readfds);
+//                 if (socks[i] > max_fd) max_fd = socks[i];
+//             }
+//         }
+//         tv.tv_sec = 0;
+//         tv.tv_usec = 50000;
+
+//         int ready = select(max_fd + 1, &readfds, NULL, NULL, &tv);
+//         if (ready < 0) {
+//             perror("[thread_r] Select failed");
+//             break;
+//         }
+
+//         for (int i = 0; i < MAX_SOCKETS; i++) {
+//             if (!shm->sockets[i].is_free && FD_ISSET(socks[i], &readfds)) {
+//                 KTP_Message msg;
+//                 struct sockaddr_in sender;
+//                 socklen_t sender_len = sizeof(sender);
+//                 int recv_len = recvfrom(socks[i], &msg, sizeof(KTP_Message), 0, (struct sockaddr*)&sender, &sender_len);
+//                 if (recv_len > 0) {
+//                     if (dropMessage(shm->drop_probability)) {
+//                         printf("[thread_r] Dropped packet: seq=%d\n", msg.seq_num);
+//                         continue;
+//                     }
+//                     int src_port = ntohs(sender.sin_port);
+//                     int dest_sockfd = (src_port == PORT_USER1) ? 1 : 0;
+//                     int sender_sockfd = (src_port == PORT_USER1) ? 0 : 1;
+
+//                     if (msg.type == MSG_TYPE_DATA) {
+//                         int expected = shm->sockets[dest_sockfd].rwnd.base;
+//                         if (msg.seq_num >= expected && msg.seq_num < expected + WINDOW_SIZE) {
+//                             int idx = msg.seq_num - expected;
+//                             if (idx < WINDOW_SIZE && (idx >= shm->sockets[dest_sockfd].rwnd.size || 
+//                                 shm->sockets[dest_sockfd].rwnd.messages[idx].seq_num != msg.seq_num)) {
+//                                 shm->sockets[dest_sockfd].rwnd.messages[idx] = msg;
+//                                 if (idx >= shm->sockets[dest_sockfd].rwnd.size) {
+//                                     shm->sockets[dest_sockfd].rwnd.size = idx + 1;
+//                                 }
+//                             }
+//                             while (shm->sockets[dest_sockfd].rwnd.size > 0 && 
+//                                    shm->sockets[dest_sockfd].rwnd.messages[0].seq_num == shm->sockets[dest_sockfd].rwnd.base) {
+//                                 if (shm->sockets[dest_sockfd].recv_count < WINDOW_SIZE) {
+//                                     shm->sockets[dest_sockfd].recv_buffer[shm->sockets[dest_sockfd].recv_count++] = 
+//                                         shm->sockets[dest_sockfd].rwnd.messages[0];
+//                                 }
+//                                 shm->sockets[dest_sockfd].rwnd.base = (shm->sockets[dest_sockfd].rwnd.base + 1) % 256;
+//                                 for (int j = 1; j < shm->sockets[dest_sockfd].rwnd.size; j++) {
+//                                     shm->sockets[dest_sockfd].rwnd.messages[j - 1] = shm->sockets[dest_sockfd].rwnd.messages[j];
+//                                 }
+//                                 shm->sockets[dest_sockfd].rwnd.size--;
+//                             }
+//                             printf("[thread_r] Received for socket %d: seq=%d, %s\n", dest_sockfd, msg.seq_num, msg.payload);
+//                         }
+//                         KTP_Message ack;
+//                         ack.type = MSG_TYPE_ACK;
+//                         ack.seq_num = (shm->sockets[dest_sockfd].rwnd.base - 1 + 256) % 256;
+//                         sprintf(ack.payload, "%d", WINDOW_SIZE - shm->sockets[dest_sockfd].recv_count);
+//                         sendto(socks[i], &ack, sizeof(KTP_Message), 0, (struct sockaddr*)&sender, sizeof(sender));
+//                         printf("[thread_r] Sent ACK for socket %d: seq=%d, rwnd=%s\n", dest_sockfd, ack.seq_num, ack.payload);
+//                     } else if (msg.type == MSG_TYPE_ACK) {
+//                         int acked = msg.seq_num;
+//                         while (shm->sockets[sender_sockfd].swnd.size > 0 && 
+//                                shm->sockets[sender_sockfd].swnd.messages[0].seq_num <= acked) {
+//                             for (int j = 1; j < shm->sockets[sender_sockfd].swnd.size; j++) {
+//                                 shm->sockets[sender_sockfd].swnd.messages[j - 1] = shm->sockets[sender_sockfd].swnd.messages[j];
+//                                 shm->sockets[sender_sockfd].swnd.timestamps[j - 1] = shm->sockets[sender_sockfd].swnd.timestamps[j];
+//                             }
+//                             shm->sockets[sender_sockfd].swnd.size--;
+//                             shm->sockets[sender_sockfd].swnd.base = (shm->sockets[sender_sockfd].swnd.base + 1) % 256;
+//                         }
+//                         printf("[thread_r] ACKed for socket %d: seq=%d, swnd.base=%d, swnd.size=%d\n", 
+//                                sender_sockfd, acked, shm->sockets[sender_sockfd].swnd.base, shm->sockets[sender_sockfd].swnd.size);
+//                     }
+//                 }
+//             }
+//         }
+//     }
+
+//     for (int i = 0; i < MAX_SOCKETS; i++) close(socks[i]);
+//     detach_shared_memory(shm);
+//     return NULL;
+// }
+
+
+// void *thread_s(void *arg) {
+//     ThreadArgs *args = (ThreadArgs *)arg;
+//     int shmid = args->shmid;
+//     printf("[thread_s] Starting with shmid=%d...\n", shmid);
+//     shm = attach_shared_memory(shmid);
+//     if (shm == NULL) return NULL;
+
+//     const int T = 2;
+//     while (1) {
+//         sleep(T / 2);
+//         time_t now = time(NULL);
+//         for (int i = 0; i < MAX_SOCKETS; i++) {
+//             if (!shm->sockets[i].is_free) {
+//                 // Send new messages from send_buffer
+//                 while (shm->sockets[i].send_count > 0 && shm->sockets[i].swnd.size < WINDOW_SIZE) {
+//                     KTP_Message msg = shm->sockets[i].send_buffer[0];
+//                     ssize_t sent = sendto(shm->sockets[i].sock_id, &msg, sizeof(KTP_Message), 0, 
+//                                         (struct sockaddr*)&shm->sockets[i].dest_addr, sizeof(struct sockaddr_in));
+//                     if (sent < 0) {
+//                         perror("[thread_s] sendto failed");
+//                     } else {
+//                         shm->sockets[i].swnd.messages[shm->sockets[i].swnd.size] = msg;
+//                         shm->sockets[i].swnd.timestamps[shm->sockets[i].swnd.size] = now;
+//                         shm->sockets[i].swnd.size++;
+//                         for (int j = 1; j < shm->sockets[i].send_count; j++) {
+//                             shm->sockets[i].send_buffer[j - 1] = shm->sockets[i].send_buffer[j];
+//                         }
+//                         shm->sockets[i].send_count--;
+//                         printf("[thread_s] Sent from socket %d: seq=%d\n", i, msg.seq_num);
+//                     }
+//                 }
+//                 // Retransmit timed-out messages
+//                 for (int j = 0; j < shm->sockets[i].swnd.size; j++) {
+//                     if (now - shm->sockets[i].swnd.timestamps[j] >= T) {
+//                         KTP_Message msg = shm->sockets[i].swnd.messages[j];
+//                         ssize_t sent = sendto(shm->sockets[i].sock_id, &msg, sizeof(KTP_Message), 0,
+//                                               (struct sockaddr*)&shm->sockets[i].dest_addr, sizeof(struct sockaddr_in));
+//                         if (sent < 0) {
+//                             perror("[thread_s] Retransmission failed");
+//                         } else {
+//                             shm->sockets[i].swnd.timestamps[j] = now;
+//                             printf("[thread_s] Retransmitted from socket %d: seq=%d\n", i, msg.seq_num);
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+
+//     detach_shared_memory(shm);
+//     return NULL;
+// }
+// void *thread_g(void *arg) {
+//     ThreadArgs *args = (ThreadArgs *)arg;
+//     int shmid = args->shmid;
+//     printf("[thread_g] Garbage collector starting with shmid=%d...\n", shmid);
+//     shm = attach_shared_memory(shmid);
+//     if (shm == NULL) return NULL;
+
+//     while (1) {
+//         sleep(5); // Check every 5 seconds
+//         for (int i = 0; i < MAX_SOCKETS; i++) {
+//             if (!shm->sockets[i].is_free && shm->sockets[i].process_id != 0) {
+//                 printf("[thread_g] Checking socket %d with PID %d...\n", i, shm->sockets[i].process_id);
+//                 if (kill(shm->sockets[i].process_id, 0) == -1 && errno == ESRCH) {
+//                     printf("[thread_g] Process %d terminated, cleaning up socket %d\n", shm->sockets[i].process_id, i);
+//                     shm->sockets[i].is_free = 1;
+//                     shm->sockets[i].process_id = 0;
+//                     shm->sockets[i].send_count = 0;
+//                     shm->sockets[i].recv_count = 0;
+//                     shm->sockets[i].swnd.size = 0;
+//                     shm->sockets[i].swnd.base = 0;
+//                     shm->sockets[i].swnd.next_seq = 0;
+//                     shm->sockets[i].rwnd.size = 0;
+//                     shm->sockets[i].rwnd.base = 0;
+//                     shm->sockets[i].rwnd.rwnd = WINDOW_SIZE;
+//                     printf("[thread_g] Socket %d cleaned up\n", i);
+//                 } else {
+//                     printf("[thread_g] Process %d still alive for socket %d\n", shm->sockets[i].process_id, i);
+//                 }
+//             }
+//         }
+//     }
+
+//     detach_shared_memory(shm);
+//     return NULL;
+// }
+
 void *thread_r(void *arg) {
     ThreadArgs *args = (ThreadArgs *)arg;
     int shmid = args->shmid;
@@ -260,7 +474,7 @@ void *thread_r(void *arg) {
                 socklen_t sender_len = sizeof(sender);
                 int recv_len = recvfrom(socks[i], &msg, sizeof(KTP_Message), 0, (struct sockaddr*)&sender, &sender_len);
                 if (recv_len > 0) {
-                    if (dropMessage()) {
+                    if (dropMessage(shm->drop_probability)) {
                         printf("[thread_r] Dropped packet: seq=%d\n", msg.seq_num);
                         continue;
                     }
@@ -279,7 +493,6 @@ void *thread_r(void *arg) {
                                     shm->sockets[dest_sockfd].rwnd.size = idx + 1;
                                 }
                             }
-                            // Slide the window and move in-order messages to recv_buffer
                             while (shm->sockets[dest_sockfd].rwnd.size > 0 && 
                                    shm->sockets[dest_sockfd].rwnd.messages[0].seq_num == shm->sockets[dest_sockfd].rwnd.base) {
                                 if (shm->sockets[dest_sockfd].recv_count < WINDOW_SIZE) {
@@ -293,11 +506,7 @@ void *thread_r(void *arg) {
                                 shm->sockets[dest_sockfd].rwnd.size--;
                             }
                             printf("[thread_r] Received for socket %d: seq=%d, %s\n", dest_sockfd, msg.seq_num, msg.payload);
-                        } else {
-                            printf("[thread_r] Out-of-window packet dropped for socket %d: seq=%d (expected %d)\n", 
-                                   dest_sockfd, msg.seq_num, expected);
                         }
-                        // Send ACK with the latest base - 1 (last in-order received)
                         KTP_Message ack;
                         ack.type = MSG_TYPE_ACK;
                         ack.seq_num = (shm->sockets[dest_sockfd].rwnd.base - 1 + 256) % 256;
@@ -321,30 +530,6 @@ void *thread_r(void *arg) {
                 }
             }
         }
-
-        // Send queued messages
-        for (int i = 0; i < MAX_SOCKETS; i++) {
-            if (!shm->sockets[i].is_free && shm->sockets[i].send_count > 0) {
-                while (shm->sockets[i].send_count > 0 && shm->sockets[i].swnd.size < WINDOW_SIZE) {
-                    KTP_Message msg = shm->sockets[i].send_buffer[0];
-                    ssize_t sent = sendto(socks[i], &msg, sizeof(KTP_Message), 0, 
-                                        (struct sockaddr*)&shm->sockets[i].dest_addr, sizeof(struct sockaddr_in));
-                    if (sent < 0) {
-                        perror("[thread_r] sendto failed");
-                    } else {
-                        shm->sockets[i].swnd.messages[shm->sockets[i].swnd.size] = msg;
-                        shm->sockets[i].swnd.timestamps[shm->sockets[i].swnd.size] = time(NULL);
-                        shm->sockets[i].swnd.size++;
-                        for (int j = 1; j < shm->sockets[i].send_count; j++) {
-                            shm->sockets[i].send_buffer[j - 1] = shm->sockets[i].send_buffer[j];
-                        }
-                        shm->sockets[i].send_count--;
-                        printf("[thread_r] Sent from socket %d to port %d: seq=%d, %s\n", 
-                               i, ntohs(shm->sockets[i].dest_addr.sin_port), msg.seq_num, msg.payload);
-                    }
-                }
-            }
-        }
     }
 
     for (int i = 0; i < MAX_SOCKETS; i++) close(socks[i]);
@@ -359,14 +544,30 @@ void *thread_s(void *arg) {
     shm = attach_shared_memory(shmid);
     if (shm == NULL) return NULL;
 
-    const int T = 2;
     while (1) {
-        sleep(T / 2);
+        sleep(T / 2); // Use T from ksocket.h
         time_t now = time(NULL);
         for (int i = 0; i < MAX_SOCKETS; i++) {
-            if (!shm->sockets[i].is_free && shm->sockets[i].swnd.size > 0) {
+            if (!shm->sockets[i].is_free) {
+                while (shm->sockets[i].send_count > 0 && shm->sockets[i].swnd.size < WINDOW_SIZE) {
+                    KTP_Message msg = shm->sockets[i].send_buffer[0];
+                    ssize_t sent = sendto(shm->sockets[i].sock_id, &msg, sizeof(KTP_Message), 0, 
+                                        (struct sockaddr*)&shm->sockets[i].dest_addr, sizeof(struct sockaddr_in));
+                    if (sent < 0) {
+                        perror("[thread_s] sendto failed");
+                    } else {
+                        shm->sockets[i].swnd.messages[shm->sockets[i].swnd.size] = msg;
+                        shm->sockets[i].swnd.timestamps[shm->sockets[i].swnd.size] = now;
+                        shm->sockets[i].swnd.size++;
+                        for (int j = 1; j < shm->sockets[i].send_count; j++) {
+                            shm->sockets[i].send_buffer[j - 1] = shm->sockets[i].send_buffer[j];
+                        }
+                        shm->sockets[i].send_count--;
+                        printf("[thread_s] Sent from socket %d: seq=%d\n", i, msg.seq_num);
+                    }
+                }
                 for (int j = 0; j < shm->sockets[i].swnd.size; j++) {
-                    if (now - shm->sockets[i].swnd.timestamps[j] >= T) {
+                    if (now - shm->sockets[i].swnd.timestamps[j] >= T) { // Use T from ksocket.h
                         KTP_Message msg = shm->sockets[i].swnd.messages[j];
                         ssize_t sent = sendto(shm->sockets[i].sock_id, &msg, sizeof(KTP_Message), 0,
                                               (struct sockaddr*)&shm->sockets[i].dest_addr, sizeof(struct sockaddr_in));
@@ -374,8 +575,7 @@ void *thread_s(void *arg) {
                             perror("[thread_s] Retransmission failed");
                         } else {
                             shm->sockets[i].swnd.timestamps[j] = now;
-                            printf("[thread_s] Retransmitted from socket %d: seq=%d, %s (swnd.base=%d, swnd.size=%d)\n", 
-                                   i, msg.seq_num, msg.payload, shm->sockets[i].swnd.base, shm->sockets[i].swnd.size);
+                            printf("[thread_s] Retransmitted from socket %d: seq=%d\n", i, msg.seq_num);
                         }
                     }
                 }
@@ -395,7 +595,7 @@ void *thread_g(void *arg) {
     if (shm == NULL) return NULL;
 
     while (1) {
-        sleep(5); // Check every 5 seconds
+        sleep(5);
         for (int i = 0; i < MAX_SOCKETS; i++) {
             if (!shm->sockets[i].is_free && shm->sockets[i].process_id != 0) {
                 printf("[thread_g] Checking socket %d with PID %d...\n", i, shm->sockets[i].process_id);
