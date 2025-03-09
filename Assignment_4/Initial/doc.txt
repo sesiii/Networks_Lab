@@ -1,3 +1,10 @@
 ./initsocket
 ./user2 <id>
 ./user1 <id>
+
+
+
+gcc ksocket.c initksocket.c -o initksocket -lpthread
+gcc ksocket.c user1.c -o user1 -lpthread
+gcc ksocket.c user2.c -o user2 -lpthread
+
