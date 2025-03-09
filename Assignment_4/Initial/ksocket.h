@@ -11,52 +11,58 @@
 #include <pthread.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <errno.h>
 
-#define MAX_SOCKETS 10          // Maximum number of KTP sockets
-#define MESSAGE_SIZE 512        // Fixed message size (512 bytes)
-#define WINDOW_SIZE 10          // Window size for flow control
-#define SEQ_NUM_BITS 8          // Sequence number is 8 bits (0-255)
+#define MAX_SOCKETS 10 // Maximum number of KTP sockets
+#define MESSAGE_SIZE 512
 
-// Error Codes
-#define ENOSPACE -1             // No space in shared memory
-#define ENOTBOUND -2            // Socket not bound
-#define ENOMESSAGE -3           // No message available in buffer
+// Error codes / special return values
+#define ENOSPACE   -1
+#define ENOTBOUND  -2
+#define ENOMESSAGE -3
 
-// KTP Socket Structure
+// Simple KTP socket structure
 typedef struct {
-    int is_free;                // 1 if free, 0 if allotted
-    pid_t process_id;           // Process ID of the creator
-    int udp_socket;             // Corresponding UDP socket
-    struct sockaddr_in src_addr; // Source IP/Port
-    struct sockaddr_in dest_addr; // Destination IP/Port
-    char send_buffer[WINDOW_SIZE][MESSAGE_SIZE]; // Send buffer
-    char recv_buffer[WINDOW_SIZE][MESSAGE_SIZE]; // Receive buffer
-    int swnd_size;              // Sender window size
-    int rwnd_size;              // Receiver window size
-    int last_ack;               // Last acknowledged sequence number
-    int last_seq_sent;          // Last sequence number sent
-    int last_seq_recv;          // Last sequence number received
+    int is_free;      // 1 if free, 0 if allocated
+    int udp_fd;       // Underlying UDP file descriptor
+    pid_t creator_pid;// Creator process ID
+
+    struct sockaddr_in src_addr; // local (bind) address
+    struct sockaddr_in dst_addr; // remote address
+
+    // Basic buffers for storing a single message
+    char recv_buffer[MESSAGE_SIZE];
+    char send_buffer[MESSAGE_SIZE];
+    int has_data;
 } KTP_Socket;
 
-// Shared Memory Structure
+// Shared memory structure
 typedef struct {
-    KTP_Socket sockets[MAX_SOCKETS]; // Array of KTP sockets
+    KTP_Socket sockets[MAX_SOCKETS];
 } SharedMemory;
 
-// Declare shm as an extern variable
+// Extern reference
 extern SharedMemory* shm;
 
-// Function Prototypes
+// Shared memory functions
 int init_shared_memory();
 SharedMemory* attach_shared_memory(int shmid);
-void detach_shared_memory(SharedMemory* shm);
+void detach_shared_memory(SharedMemory* ptr);
 void cleanup_shared_memory(int shmid);
 
-// Core KTP Functions
+// Core KTP calls
 int k_socket();
-int k_bind(int sockfd, const char* src_ip, int src_port, const char* dest_ip, int dest_port);
+int k_bind(int sockfd, const char* src_ip, int src_port, const char* dst_ip, int dst_port);
 int k_sendto(int sockfd, const void* buf, size_t len, int flags);
 int k_recvfrom(int sockfd, void* buf, size_t len, int flags);
 int k_close(int sockfd);
 
-#endif // KSOCKET_H
+// Thread receiving
+void* thread_r(void* arg);
+
+// Thread R arg structure
+typedef struct {
+    int shmid;
+} ThreadRArgs;
+
+#endif
