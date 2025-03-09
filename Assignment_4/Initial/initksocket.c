@@ -1,25 +1,48 @@
 #include "ksocket.h"
-#include <stdio.h>
+#include <pthread.h>
+#include <signal.h>
+#include <unistd.h>
+
+static volatile int keepRunning = 1;
+
+// Ctrl+C handler
+void intHandler(int dummy) {
+    (void)dummy;
+    keepRunning = 0;
+}
 
 int main() {
-    printf("Initializing shared memory...\n");
+    signal(SIGINT, intHandler);
 
-    // Initialize shared memory
+    printf("[initksocket] Initializing shared memory...\n");
     int shmid = init_shared_memory();
-    if (shmid == -1) {
-        fprintf(stderr, "Failed to initialize shared memory\n");
+    if (shmid < 0) {
+        fprintf(stderr, "[initksocket] Failed to init shared mem\n");
         return 1;
     }
+    printf("[initksocket] Shared memory created with ID: %d\n", shmid);
 
-    printf("Shared memory created with ID: %d\n", shmid);
+    // Spawn thread R
+    pthread_t thr;
+    ThreadRArgs tra;
+    tra.shmid = shmid;
 
-    // Keep the program running so the shared memory is not deleted
-    printf("Shared memory is ready. Run user1 and user2 with shmid = %d\n", shmid);
-    printf("Press Ctrl+C to exit and cleanup shared memory.\n");
+    printf("[initksocket] Starting Thread R...\n");
+    if (pthread_create(&thr, NULL, thread_r, &tra) != 0) {
+        perror("[initksocket] pthread_create failed");
+        cleanup_shared_memory(shmid);
+        return 1;
+    }
+    printf("[initksocket] Thread R started\n");
+    printf("[initksocket] Shared memory is ready. Run user1 and user2 with shmid=%d.\n", shmid);
+    printf("[initksocket] Press Ctrl+C to stop.\n");
 
-    while (1) {
-        sleep(1); // Keep the program running
+    // Wait for Ctrl+C
+    while (keepRunning) {
+        sleep(1);
     }
 
+    printf("[initksocket] Caught Ctrl+C, cleaning up...\n");
+    cleanup_shared_memory(shmid);
     return 0;
 }
