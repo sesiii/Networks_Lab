@@ -1,0 +1,180 @@
+KTP Socket Implementation Documentation
+
+Files
+- ksocket.h
+- ksocket.c
+- initksocket.c
+- user1.c
+- user2.c
+- Makefile (to generate libksocket.a)
+- Makefile (to create the executable to run initksocket.c)
+- Makefile (to create the executables for user1.c and user2.c)
+
+Data Structures and Functions
+
+ksocket.h
+
+Data Structures
+1. ktp_header_t
+    - type: Message type (DATA or ACK)
+    - seq_num: Sequence number
+    - last_ack: Last acknowledged sequence number (for ACK)
+    - rwnd_size: Receiver window size
+
+2. ktp_message_t
+    - header: KTP header
+    - data: Message data
+    - data: Message data
+    - timestamp: Timestamp for retransmission
+
+3. window_t
+    - base: Base sequence number
+    - next_seq: Next sequence number to use
+    - size: Current window size
+    - max_size: Maximum window size
+    - msgs: Messages in the window
+
+4. recv_buffer_t
+    - msgs: Received messages
+    - start: Start index of the buffer
+    - end: End index of the buffer
+    - count: Number of messages in the buffer
+    - last_ack: Last acknowledged sequence number
+    - expected_seq: Next expected sequence number
+    - rwnd_size: Current receive window size
+    - nospace: Flag to indicate no space in the buffer
+
+5. send_buffer_t
+    - msgs: Messages to be sent
+    - start: Start index of the buffer
+    - end: End index of the buffer
+    - count: Number of messages in the buffer
+    - swnd: Sending window
+
+6. ktp_socket_t
+    - is_active: 1 if socket is active, 0 otherwise
+    - process_id: Process ID of the creator
+    - udp_socket: Associated UDP socket
+    - src_addr: Source address
+    - dst_addr: Destination address
+    - send_buf: Send buffer
+    - recv_buf: Receive buffer
+    - mutex: Mutex for thread safety
+
+7. shared_memory_t
+    - sockets: Array of KTP sockets
+    - mutex: Mutex for shared memory access
+
+Functions
+1. int k_socket(int domain, int type, int protocol);
+   - Creates a KTP socket.
+
+2. int k_bind(int sockfd, const struct sockaddr *src_addr, socklen_t src_addrlen, const struct sockaddr *dst_addr, socklen_t dst_addrlen);
+   - Binds the KTP socket to addresses.
+
+3. ssize_t k_sendto(int sockfd, const void *buf, size_t len, int flags);
+   - Sends data through the KTP socket.
+
+4. ssize_t k_recvfrom(int sockfd, void *buf, size_t len, int flags);
+   - Receives data from the KTP socket.
+
+5. int k_close(int sockfd);
+   - Closes the KTP socket.
+
+6. int dropMessage(float p);
+   - Determines whether to drop a message based on a probability.
+
+ksocket.c
+
+Functions
+1. int k_socket(int domain, int type, int protocol);
+   - Initializes shared memory.
+   - Allocates a KTP socket and initializes its buffers.
+
+2. int k_bind(int sockfd, const struct sockaddr *src_addr, socklen_t src_addrlen, const struct sockaddr *dst_addr, socklen_t dst_addrlen);
+   - Binds the KTP socket to the source and destination addresses.
+
+3. ssize_t k_sendto(int sockfd, const void *buf, size_t len, int flags);
+   - Adds a message to the send buffer.
+   - Sends the message if space is available in the sending window.
+
+4. ssize_t k_recvfrom(int sockfd, void *buf, size_t len, int flags);
+   - Retrieves a message from the receive buffer.
+
+5. int k_close(int sockfd);
+   - Closes the KTP socket and frees associated resources.
+
+initksocket.c
+
+Functions
+1. int create_shared_memory();
+   - Creates and initializes shared memory for KTP sockets.
+
+2. void* receiver_thread(void *arg);
+   - Listens for incoming messages.
+   - Adds received messages to the appropriate buffers.
+
+3. void* sender_thread(void *arg);
+   - Sends messages from the send buffer.
+   - Retransmits messages if needed.
+
+4. void cleanup_sockets();
+   - Cleans up resources for inactive sockets.
+
+5. void handle_signal(int sig);
+   - Handles termination signals to clean up resources.
+
+user1.c (sender)
+
+Functions
+1. int main(int argc, char *argv[]);
+   - Initializes the sender application.
+   - Binds the KTP socket to addresses.
+   - Reads a file and sends it in chunks using the KTP socket.
+
+user2.c (receiver)
+
+Functions
+1. int main(int argc, char *argv[]);
+   - Initializes the receiver application.
+   - Binds the KTP socket to addresses.
+   - Receives data from the KTP socket and writes it to a file.
+
+Results for Varying p Values
+
+p Value | Chunks | Transmissions | Avg Transmissions per Message | Time Taken (s) | Throughput (KB/s)
+0.01    | 47     | 344           | 7.32                          | 0.02           | 980.27
+0.1     | 47     | 715           | 15.21                         | 0.03           | 524.89
+0.15    | 47     | 821           | 17.47                         | 0.04           | 427.01
+0.2     | 47     | 773           | 16.45                         | 0.04           | 471.19
+0.25    | 47     | 977           | 20.79                         | 0.05           | 377.48
+0.3     | 47     | 1233          | 26.23                         | 0.06           | 284.52
+0.35    | 47     | 1799          | 38.28                         | 0.09           | 196.37
+0.4     | 47     | 1765          | 37.55                         | 0.09           | 190.32
+0.45    | 47     | 1702          | 36.21                         | 0.09           | 204.29
+0.50    | 47     | 2557          | 54.40                         | 0.13           | 137.76
+
+Makefiles
+
+Makefile-lib
+- Run using make -f Makefile-lib to create the static library.
+
+Makefile-initksocket
+- Run using make -f Makefile-initksocket to create the initksocket executable.
+
+Makefile-users
+- Run using make -f Makefile-users to create the sender and receiver executables.
+
+
+Usage:
+Terminal 1
+./initksocket
+
+Terminal 2 (receiver)
+./user2 <shmid> output.txt 
+
+Terminal 3 (sender)
+./user1 <shmid> input.txt
+or 
+./user1 <shmid> input.txt 0.3
+(shmid is generated from the ./initksocket terminal)
