@@ -39,7 +39,7 @@ def commit_and_push():
         subprocess.run(["git", "commit", "-m", commit_message])
 
         # Push immediately after each commit to increase contribution count
-        subprocess.run(["git", "push", "origin", "main"])  # Change branch if necessary
+        subprocess.run(["git", "push", "origin", "master"])  # Change branch if necessary
         time.sleep(2)  # Small delay to mimic manual commits
 
     print("All changes committed and pushed successfully!")
