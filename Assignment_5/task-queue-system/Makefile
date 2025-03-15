@@ -1,15 +1,10 @@
-CC=gcc
-CFLAGS=-Wall -g
-SERVER=server
-CLIENT=client
-
-all: $(SERVER) $(CLIENT)
-
-$(SERVER): server.c
-	$(CC) $(CFLAGS) -o $(SERVER) server.c
-
-$(CLIENT): client.c
-	$(CC) $(CFLAGS) -o $(CLIENT) client.c
+all:
+	gcc -o server server.c
+	gcc -o client1 client1.c
+	gcc -o client2 client2.c
+	gcc -o client3 client3.c
+	gcc -o client4 client4.c
+	./server tasks.txt
 
 clean:
-	rm -f $(SERVER) $(CLIENT)
+	rm -f server client1 client2 client3 client4
