@@ -27,11 +27,18 @@ int main() {
         write(client_socket, buffer, strlen(buffer));
         printf("Requested task\n");
         
+        
         memset(buffer, 0, MAX_BUFFER);
         read(client_socket, buffer, MAX_BUFFER - 1);
+        buffer[MAX_BUFFER - 1] = '\0';
         printf("Received: %s\n", buffer);
+
+        if (strcmp(buffer, "exit") == 0) {
+            printf("Received: exit\n");
+            break;
+        }
         
-        sleep(1);  // Small delay between requests
+        sleep(1);  
     }
     
     close(client_socket);
