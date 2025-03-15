@@ -26,11 +26,27 @@ int main() {
     write(client_socket, buffer, strlen(buffer));
     
     // Read response but don't do anything with it
-    read(client_socket, buffer, MAX_BUFFER - 1);
-    printf("Received task but not responding...\n");
+    int bytes_read = read(client_socket, buffer, MAX_BUFFER - 1);
+    buffer[bytes_read] = '\0';
+    char *response = buffer;
+    printf("Received: %s\n", response);
+
+    // printf("");/
     
     while (1) {
+        printf("Received task but not responding...\n");
         sleep(1);
+        
+        int bytes_written = read(client_socket, buffer, strlen(response));
+        buffer[bytes_written] = '\0';
+        char *response = buffer;
+        // printf("Received: %s\n", response);
+
+        if(strcmp(response,"exit")){
+
+            printf("Received: exit\n");
+            break;
+        }
     }
     
     close(client_socket);
