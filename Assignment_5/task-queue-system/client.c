@@ -35,12 +35,12 @@ double calculate(char *expression) {
             return num1 * num2;
         case '/':
             if (num2 == 0) {
-                printf("Error: Division by zero\n");
+                printf("Client %d: Error: Division by zero\n",getpid());
                 return 0;
             }
             return num1 / num2;
         default:
-            printf("Error: Unsupported operator %c\n", operator);
+            printf("Client %d: Error: Unsupported operator %c\n",getpid(), operator);
             return 0;
     }
 }
@@ -78,14 +78,14 @@ int main() {
         exit(EXIT_FAILURE);
     }
     
-    printf("Connected to server at %s:%d\n", server_ip, PORT);
+    printf("Client %d: Connected to server at %s:%d\n", getpid(),server_ip, PORT);
     
     char buffer[MAX_BUFFER];
     char send_buffer[MAX_BUFFER];
     
     while (1) {
         // Request a new task
-        printf("Requesting task from server...\n");
+        printf("Client %d: Requesting task from server...\n", getpid());
         strcpy(send_buffer, "GET_TASK");
         write(client_socket, send_buffer, strlen(send_buffer));
         
@@ -99,13 +99,13 @@ int main() {
             
             // Check if there are no tasks available
             if (strncmp(buffer, "No tasks available", 18) == 0) {
-                printf("No more tasks available. Exiting...\n");
+                printf(" Client %d: No more tasks available. Exiting...\n", getpid());
                 break;
             }
             
             // Check for error messages
             if (strncmp(buffer, "Error", 5) == 0) {
-                printf("Received error: %s\n", buffer);
+                printf("Client %d: Received error: %s\n",getpid(), buffer);
                 sleep(1);
                 continue;
             }
@@ -116,7 +116,7 @@ int main() {
                 char expression[MAX_BUFFER];
                 strcpy(expression, buffer + 6);
                 
-                printf("Processing task: %s\n", expression);
+                printf("Client %d: Processing task: %s\n",getpid(), expression);
                 
                 
                 usleep(1);
@@ -124,10 +124,10 @@ int main() {
                 // Calculate the result
                 double result = calculate(expression);
                 
-                usleep(3);
+                sleep(4);
                 // Send the result back to the server
                 sprintf(send_buffer, "RESULT %.2f", result);
-                printf("Sending result: %s\n", send_buffer);
+                printf("Client %d: Sending result: %s\n", getpid(),send_buffer);
 
                 write(client_socket, send_buffer, strlen(send_buffer));
                 
@@ -137,17 +137,17 @@ int main() {
                 
                 if (bytes_read > 0) {
                     buffer[bytes_read] = '\0';
-                    printf("Server: %s\n", buffer);
+                    printf("Client %d: Server: %s\n",getpid(), buffer);
                 }
                 
                 // Wait a moment before requesting the next task
                 sleep(1);
             }
         } else if (bytes_read == 0) {
-            printf("Server disconnected\n");
+            printf("Client %d:Server disconnected\n",getpid());
             break;
         } else {
-            perror("read error");
+            perror(" read error");
             break;
         }
     }
