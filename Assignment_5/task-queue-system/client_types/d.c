@@ -7,6 +7,8 @@
 #include <arpa/inet.h>
 
 #define PORT 8080
+#define MAX_BUFFER 1024
+
 
 int main() {
     const char *server_ip = "127.0.0.1";
@@ -31,11 +33,19 @@ int main() {
         perror("connect failed");
         exit(EXIT_FAILURE);
     }
-    
+
+    char buffer[MAX_BUFFER];
     printf("Connected to server and doing nothing...\n");
-    
+    printf("client %d: Connected to server at %s:%d\n", getpid(),server_ip, PORT);
     // Infinite loop to keep connection open
     while (1) {
+        int bytes_read=read(client_socket,buffer,MAX_BUFFER-1);
+        buffer[bytes_read]='\0';
+        
+        if(strcmp(buffer,"exit")==0){
+            printf("Received: exit\n");
+            break;
+        }
         sleep(1);
     }
     
