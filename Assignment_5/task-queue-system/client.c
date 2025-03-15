@@ -136,7 +136,7 @@ int main() {
 
     strcpy(send_buffer, "exit");
     write(client_socket, send_buffer, strlen(send_buffer));
-    
+
     close(client_socket);
     
     return 0;
