@@ -1,6 +1,3 @@
-# Task Queue System
-
-This project implements a simple Task Queue Server and Worker Client system using sockets in C. The server listens for incoming task requests from clients, processes these requests, and sends back the results. The client connects to the server, sends task requests, and processes the responses.
 
 ## Files
 
@@ -23,7 +20,7 @@ This will generate the executables `server` and `client`.
 To start the server, run the following command:
 
 ```
-./server
+./server <input txtfile>
 ```
 
 The server will start listening for incoming task requests.
@@ -44,6 +41,4 @@ The client will connect to the server and send task requests. You can run multip
 - The client can send multiple task requests in a single run.
 - The server processes each task and sends back the results to the client.
 
-## Notes
 
-Ensure that the server is running before starting the client. Adjust the server's IP address and port in the client code if necessary.
