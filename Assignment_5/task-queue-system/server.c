@@ -1,12 +1,8 @@
+//Name: Dadi Sasank Kumar
+//R NO: 22CS10020
+//Assignment 5
+//Server code
 
-
-/*
-=====================================
-Assignment 5 Submission
-Name: Dadi Sasank Kumar
-Roll number: 22CS10020
-=====================================
-*/
 
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -38,6 +34,7 @@ typedef struct {
     int assigned;  // 0: not assigned, 1: assigned but not completed, 2: completed
     pid_t client_pid;
     time_t assigned_time;
+    double result; // Added to store result
 } Task;
 
 typedef struct {
@@ -47,6 +44,25 @@ typedef struct {
 
 int shm_id;
 SharedData *shared_data;
+char task_filename[MAX_BUFFER]; // To store filename for updating
+
+void save_results_to_file() {
+    FILE* file = fopen(task_filename, "w");
+    if (file == NULL) {
+        perror("Error opening task file for writing");
+        return;
+    }
+
+    for (int i = 0; i < shared_data->task_count; i++) {
+        if (shared_data->tasks[i].assigned == 2) {
+            fprintf(file, "%s = %.2f\n", shared_data->tasks[i].expression, shared_data->tasks[i].result);
+        } else {
+            fprintf(file, "%s\n", shared_data->tasks[i].expression);
+        }
+    }
+    fclose(file);
+    printf("Results saved to %s\n", task_filename);
+}
 
 void handle_sigchld(int sig) {
     int status;
@@ -65,6 +81,7 @@ void handle_sigchld(int sig) {
 }
 
 int load_tasks(const char* filename) {
+    strcpy(task_filename, filename);
     FILE* file = fopen(filename, "r");
     if (file == NULL) {
         perror("Error opening task file");
@@ -81,6 +98,7 @@ int load_tasks(const char* filename) {
             shared_data->tasks[shared_data->task_count].assigned = 0;
             shared_data->tasks[shared_data->task_count].client_pid = -1;
             shared_data->tasks[shared_data->task_count].assigned_time = 0;
+            shared_data->tasks[shared_data->task_count].result = 0.0;
             shared_data->task_count++;
         }
     }
@@ -123,6 +141,8 @@ void check_task_timeout(int client_socket, pid_t pid) {
                 char response[MAX_BUFFER];
                 sprintf(response, "Error: Task timeout after %d seconds", TASK_TIMEOUT);
                 write(client_socket, response, strlen(response));
+                strcpy(response, "exit");
+                write(client_socket, response, strlen(response));
                 return;
             }
         }
@@ -141,17 +161,17 @@ void handle_client(int client_socket) {
     printf("Child process %d handling client\n", pid);
     
     time_t last_activity = time(NULL);
-    int task_request_count = 0;  // Counter for task requests without completion
+    int task_request_count = 0;
     
     while (1) {
         time_t current_time = time(NULL);
         
         if (difftime(current_time, last_activity) > IDLE_TIMEOUT) {
             printf("Client %d idle timeout after %d seconds\n", pid, IDLE_TIMEOUT);
-            char *buffer="exit";
-            write(client_socket, buffer, strlen(buffer));
             sprintf(response, "Error: Connection timed out due to inactivity");
             write(client_socket, response, strlen(response));
+            // strcpy(response, "exit");
+            // write(client_socket, response, strlen(response));
             break;
         }
         
@@ -175,13 +195,8 @@ void handle_client(int client_socket) {
                         if (task_request_count >= MAX_TASK_REQUESTS) {
                             printf("Client %d exceeded %d task requests without completion\n", 
                                    pid, MAX_TASK_REQUESTS);
-                            sprintf(response, "Error: Exceeded maximum task requests (%d) without completion. Disconnecting.", 
-                                    MAX_TASK_REQUESTS);
+                            sprintf(response, "exit");
                             write(client_socket, response, strlen(response));
-                            // Release the current task
-                            char *buffer="exit";
-                            write(client_socket, buffer, strlen(buffer));
-
                             shared_data->tasks[i].assigned = 0;
                             shared_data->tasks[i].client_pid = -1;
                             shared_data->tasks[i].assigned_time = 0;
@@ -197,32 +212,38 @@ void handle_client(int client_socket) {
                 }
                 
                 if (!has_task) {
-                    task_request_count = 0; 
+                    task_request_count = 0;
                     int task_index = get_next_task();
                     if (task_index >= 0) {
                         shared_data->tasks[task_index].assigned = 1;
                         shared_data->tasks[task_index].client_pid = pid;
                         shared_data->tasks[task_index].assigned_time = time(NULL);
-                        
                         sprintf(response, "Task: %s", shared_data->tasks[task_index].expression);
                         write(client_socket, response, strlen(response));
                         printf("Assigned task %s to client %d\n", 
                                shared_data->tasks[task_index].expression, pid);
                     } else {
-                        sprintf(response, "No tasks available");
+                        sprintf(response, "No tasks available, exit");
                         write(client_socket, response, strlen(response));
+                        // strcpy(response, "exit");
+                        // write(client_socket, response, strlen(response));
                     }
                 }
             } else if (strncmp(buffer, "RESULT", 6) == 0) {
                 int found_task = 0;
+                double result;
+                sscanf(buffer, "RESULT %lf", &result);
+                
                 for (int i = 0; i < shared_data->task_count; i++) {
                     if (shared_data->tasks[i].assigned == 1 && shared_data->tasks[i].client_pid == pid) {
-                        printf("Task %s completed by client %d. Result: %s\n", 
-                               shared_data->tasks[i].expression, pid, buffer + 7);
+                        printf("Task %s completed by client %d. Result: %.2f\n", 
+                               shared_data->tasks[i].expression, pid, result);
                         shared_data->tasks[i].assigned = 2;
+                        shared_data->tasks[i].result = result;
                         shared_data->tasks[i].assigned_time = 0;
                         found_task = 1;
-                        task_request_count = 0;  
+                        task_request_count = 0;
+                        save_results_to_file();
                         sprintf(response, "Result received. You can request another task.");
                         write(client_socket, response, strlen(response));
                         break;
@@ -236,6 +257,10 @@ void handle_client(int client_socket) {
                 
                 if (all_tasks_completed()) {
                     printf("All tasks have been completed!\n");
+                    sprintf(response, "No tasks available");
+                    write(client_socket, response, strlen(response));
+                    strcpy(response, "exit");
+                    write(client_socket, response, strlen(response));
                     break;
                 }
             } else if (strncmp(buffer, "exit", 4) == 0) {
@@ -272,6 +297,7 @@ void handle_client(int client_socket) {
 }
 
 void cleanup() {
+    save_results_to_file();
     if (shared_data) {
         shmdt(shared_data);
     }
