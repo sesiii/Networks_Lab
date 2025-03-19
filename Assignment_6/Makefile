@@ -1,13 +1,13 @@
 CC = gcc
 CFLAGS = -Wall
 
-all: mysmtp_server mysmtp_client
 
-mysmtp_server: mysmtp_server.c
-	$(CC) $(CFLAGS) -o mysmtp_server mysmtp_server.c
 
-mysmtp_client: mysmtp_client.c
-	$(CC) $(CFLAGS) -o mysmtp_client mysmtp_client.c
+all: 
+	gcc -o mysmtp_server mysmtp_server.c
+	gcc -o mysmtp_client mysmtp_client.c
+	./mysmtp_server 2500
+
 
 clean:
 	rm -f mysmtp_server mysmtp_client
