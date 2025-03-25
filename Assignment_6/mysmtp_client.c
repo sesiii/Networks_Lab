@@ -63,13 +63,13 @@ int main(int argc, char *argv[])
             break;
 
         if (strlen(buffer) <= 1)
-            continue; // Skip empty lines
+            continue; 
 
         write(sock_fd, buffer, strlen(buffer));
 
         if (strncmp(buffer, "DATA", 4) == 0)
         {
-            read_response(sock_fd, response, 0); // Read single-line response
+            read_response(sock_fd, response, 0); 
             printf("%s", response);
             if (strstr(response, "Enter your message") != NULL)
             {
@@ -81,18 +81,18 @@ int main(int argc, char *argv[])
                     if (strcmp(buffer, ".\n") == 0)
                         break;
                 }
-                read_response(sock_fd, response, 0); // Expect single-line 250 response
+                read_response(sock_fd, response, 0); 
                 printf("%s", response);
             }
         }
         else if (strncmp(buffer, "LIST", 4) == 0 || strncmp(buffer, "GET_MAIL", 8) == 0)
         {
-            read_response(sock_fd, response, 1); // Expect multi-line response
+            read_response(sock_fd, response, 1); 
             printf("%s", response);
         }
         else
         {
-            read_response(sock_fd, response, 0); // Expect single-line response
+            read_response(sock_fd, response, 0); 
             printf("%s", response);
         }
     }
