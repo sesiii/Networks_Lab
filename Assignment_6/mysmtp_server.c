@@ -25,7 +25,7 @@ void handle_client(int client_fd, struct sockaddr_in client_addr);
 void process_command(int client_fd, char *buffer, char *sender, char *recipient, int *in_data, char *email_body, int *state);
 sem_t *get_recipient_semaphore(const char *recipient);
 
-// State machine states
+
 enum
 {
     STATE_INIT = 0,
@@ -234,7 +234,7 @@ void process_command(int client_fd, char *buffer, char *sender, char *recipient,
         *in_data = 1;
         *state = STATE_DATA;
         memset(email_body, 0, BUFFER_SIZE);
-        sprintf(response, "Enter your message (end with a single dot '.'\n");
+        sprintf(response, "Enter your message (end with a single dot '.'):\n");
         write(client_fd, response, strlen(response));
     }
     else if (*in_data)
