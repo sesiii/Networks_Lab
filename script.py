@@ -647,7 +647,7 @@ def call_together_api(diff):
         "You are a senior developer writing a concise, realistic Git commit message. "
         "Based on the following git diff, write a detailed and professional commit message "
         "describing the changes. Include specifics about what was added, removed, or modified, "
-        "and why. Keep it under 20 characters if possible:\n\n"
+        "and why.Keep it under 20 characters if possible:\n\n"
         f"```diff\n{diff}\n```"
     )
 
