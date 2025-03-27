@@ -59,8 +59,3 @@ int main()
     
 
 }
-
-//added few changes
-//upated scriot in udp client
-//name: Dadi Sasank  Kumar
-//roll no: 22CS10020
