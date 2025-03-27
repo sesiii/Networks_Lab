@@ -33,5 +33,7 @@ int main()
 
     printf("UDP server listening on port %d",port);
 
-    int n=recvfrom(sock_fd,buffer,BUFFER_SIZE,0,(struct sockaddr*)client_addr,&addr_len)
+    int n=recvfrom(sock_fd,buffer,BUFFER_SIZE,0,(struct sockaddr*)&client_addr,&addr_len);
+    buffer[n]='\0';
+    printf("Client: %s\n",buffer);
 }
