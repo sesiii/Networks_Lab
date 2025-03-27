@@ -62,29 +62,31 @@
 
 
 
-#define SERVER_IP "127.0.0.1"
-#define port 8080
-#define BUFFER_SIZE 1024
+// #define SERVER_IP "127.0.0.1"
+// #define port 8080
+// #define BUFFER_SIZE 1024
 
-int main()
-{
-    int sock_fd;
-    struct sockaddr_in server_addr;
-    char buffer[BUFFER_SIZE];
-    socklen_t addr_len = sizeof(server_addr);
+// int main()
+// {
+//     int sock_fd;
+//     struct sockaddr_in server_addr;
+//     char buffer[BUFFER_SIZE];
+//     socklen_t addr_len = sizeof(server_addr);
 
-    sock_fd=socket(AF_INET, SOCK_DGRAM,0);
-    if(sock_fd<0){
-        perror("Socket creation failed.\n");
-        exit(EXIT_FAILURE);
-    }
+//     sock_fd=socket(AF_INET, SOCK_DGRAM,0);
+//     if(sock_fd<0){
+//         perror("Socket creation failed.\n");
+//         exit(EXIT_FAILURE);
+//     }
 
-    memset(&server_addr,0, sizeof(server_addr));
-    server_addr.sin_family=AF_INET;
-    server_addr.sin_port=htons(port);
-    inet_pton(AF_INET,SERVER_IP,&server_addr.sin_addr);
+//     memset(&server_addr,0, sizeof(server_addr));
+//     server_addr.sin_family=AF_INET;
+//     server_addr.sin_port=htons(port);
+//     inet_pton(AF_INET,SERVER_IP,&server_addr.sin_addr);
 
-    char *msg="Hi server bhai...\n";
-    sendto(sock_fd,msg,strlen(msg),0,(struct sockaddr*)&server_addr,sizeof(server_addr));
-    printf("Message sent to server.\n");
-}
+//     char *msg="Hi server bhai...\n";
+//     sendto(sock_fd,msg,strlen(msg),0,(struct sockaddr*)&server_addr,sizeof(server_addr));
+//     printf("Message sent to server.\n");
+// }
+
+
