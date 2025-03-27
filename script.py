@@ -655,8 +655,8 @@ def call_together_api(diff):
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=100,
-            temperature=0.7,
+            max_tokens=10000,
+            temperature=2,
             top_p=0.9,
         )
         api_response = response.choices[0].message.content.strip()
