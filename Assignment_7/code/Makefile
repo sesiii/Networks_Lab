@@ -1,6 +1,6 @@
 all:
-	gcc -o client cldp_client.c -lpthread
-	gcc -o server cldp_server.c -lpthread
-
+	gcc -o client cldp_client.c
+	gcc -o server cldp_server.c
+	sudo ./server
 clean:
-	rm -f cldp_client cldp_server
+	rm -f client server
