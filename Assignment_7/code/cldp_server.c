@@ -138,7 +138,7 @@ int main() {
             memcpy(buffer + sizeof(iph), &cldp, sizeof(cldp));
             memcpy(buffer + sizeof(iph) + sizeof(cldp), hello_payload, sizeof(hello_payload));
 
-            debug_packet("HELLO_OUT", &iph, &cldp, hello_payload);
+            // debug_packet("HELLO_OUT", &iph, &cldp, hello_payload);
 
             int broadcast_result = sendto(sock, buffer, ntohs(iph.tot_len), 0,
                                           (struct sockaddr *)&dest_addr, sizeof(dest_addr));
@@ -177,7 +177,7 @@ int main() {
                 } else {
                     received_payload[0] = '\0';
                 }
-                debug_packet("PACKET_IN", iph_rx, cldp_rx, received_payload);
+                // debug_packet("PACKET_IN", iph_rx, cldp_rx, received_payload);
 
                 // Process QUERY messages (msg_type 0x02)
                 if (cldp_rx->msg_type == 0x02) {
@@ -224,14 +224,15 @@ int main() {
                     iph_tx.daddr = iph_rx->saddr;
                     iph_tx.check = 0;
                     iph_tx.check = ip_checksum(&iph_tx, sizeof(iph_tx));
-                    // Verify checksum for outgoing response
+                    
+                    //checksum verification
                     verify_ip_checksum(&iph_tx);
 
                     memcpy(tx_buffer, &iph_tx, sizeof(iph_tx));
                     memcpy(tx_buffer + sizeof(iph_tx), &cldp_tx, sizeof(cldp_tx));
                     memcpy(tx_buffer + sizeof(iph_tx) + sizeof(cldp_tx), response_data, cldp_tx.payload_len);
 
-                    debug_packet("RESPONSE_OUT", &iph_tx, &cldp_tx, response_data);
+                    // debug_packet("RESPONSE_OUT", &iph_tx, &cldp_tx, response_data);
 
                     struct sockaddr_in reply_addr = {
                         .sin_family = AF_INET,
