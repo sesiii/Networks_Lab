@@ -52,7 +52,7 @@ int verify_ip_checksum(struct iphdr *iph) {
     }
 }
 
-// Debug function to print packet details, including the payload (if printable)
+// Debug function to print packet details, including the payload 
 void debug_packet(const char *prefix, struct iphdr *iph, struct cldp_header *cldph, const char *payload) {
     char src_ip[INET_ADDRSTRLEN], dst_ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &iph->saddr, src_ip, INET_ADDRSTRLEN);
@@ -99,8 +99,8 @@ int main() {
 
     struct sockaddr_in dest_addr = {
         .sin_family = AF_INET,
-        .sin_port = 0,  // Port is not used for raw sockets
-        .sin_addr.s_addr = inet_addr("255.255.255.255")
+        .sin_port = 0,  
+        .sin_addr.s_addr = inet_addr("255.255.255.255") //broadcasting
     };
 
     char buffer[BUFFER_SIZE];
@@ -111,7 +111,7 @@ int main() {
 
     while (1) {
         time_t now = time(NULL);
-        // Send HELLO broadcast every HELLO_INTERVAL seconds using the required identifier string
+        // Send HELLO broadcast every HELLO_INTERVAL(10) seconds
         if (now - last_hello >= HELLO_INTERVAL) {
             struct iphdr iph = {0};
             uint16_t trans_id = htons(rand() % 65535);  // network byte order
@@ -131,6 +131,7 @@ int main() {
             iph.daddr = dest_addr.sin_addr.s_addr;
             iph.check = 0;
             iph.check = ip_checksum(&iph, sizeof(iph));
+            
             // Verify the checksum before sending
             verify_ip_checksum(&iph);
 
@@ -156,18 +157,16 @@ int main() {
         FD_ZERO(&readfds);
         FD_SET(sock, &readfds);
         tv.tv_sec = 0;
-        tv.tv_usec = 100000;  // 100ms
+        tv.tv_usec = 100000;  
 
         if (select(sock + 1, &readfds, NULL, NULL, &tv) <= 0)
-            continue;  // No data available
+            continue; 
 
-        // Process incoming packets
         int len = recvfrom(sock, buffer, BUFFER_SIZE, 0, NULL, NULL);
         if (len > 0) {
             struct iphdr *iph_rx = (struct iphdr *)buffer;
             if (iph_rx->protocol == PROTOCOL_NUM) {
                 struct cldp_header *cldp_rx = (struct cldp_header *)(buffer + sizeof(*iph_rx));
-                // Extract payload from received packet
                 int payload_offset = sizeof(*iph_rx) + sizeof(*cldp_rx);
                 int pay_len = ntohs(iph_rx->tot_len) - payload_offset;
                 char received_payload[BUFFER_SIZE];
@@ -194,15 +193,12 @@ int main() {
                     char response_data[256] = "N/A";
 
                     if (payload_rx[0] == 0x01) {
-                        // QUERY for hostname
                         gethostname(response_data, sizeof(response_data));
                     } else if (payload_rx[0] == 0x02) {
-                        // QUERY for system time
                         struct timeval tv;
                         gettimeofday(&tv, NULL);
                         snprintf(response_data, sizeof(response_data), "%ld.%06ld", tv.tv_sec, tv.tv_usec);
                     } else if (payload_rx[0] == 0x03) {
-                        // QUERY for CPU load (simplified)
                         FILE *fp = popen("uptime | awk '{print $10}'", "r");
                         if (fp) {
                             fgets(response_data, sizeof(response_data), fp);
