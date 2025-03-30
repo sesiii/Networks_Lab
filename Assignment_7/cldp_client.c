@@ -34,7 +34,6 @@ uint16_t ip_checksum(void *buf, int len) {
     return (uint16_t)(~sum);
 }
 
-// Function to get local IP dynamically
 char *get_local_ip() {
     struct ifaddrs *ifaddr, *ifa;
     static char ip[INET_ADDRSTRLEN];
@@ -131,7 +130,7 @@ int main() {
                         char *payload = buffer + sizeof(*rx_iph) + sizeof(*rx_cldp);
                         payload[rx_cldp->payload_len - 1] = '\0';
                         printf("%s\n", payload);
-                        break; // Exit the loop once the correct response is received
+                        break; 
                     }
                 }
             } else {
