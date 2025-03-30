@@ -1,6 +1,3 @@
-
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,24 +13,15 @@
 #define BUFFER_SIZE 1024
 #define HELLO_INTERVAL 10
 
+// Custom Lightweight Discovery Protocol header: 8 bytes
 struct cldp_header {
-    uint8_t msg_type;
-    uint8_t payload_len;
-    uint16_t trans_id;
-    uint32_t reserved;
+    uint8_t msg_type;      // Message Type (1 byte): 0x01 for HELLO, 0x02 for QUERY, 0x03 for RESPONSE
+    uint8_t payload_len;   // Payload Length (1 byte)
+    uint16_t trans_id;     // Transaction ID (2 bytes)
+    uint32_t reserved;     // Reserved (4 bytes)
 };
 
-// Debug function to print packet details
-void debug_packet(const char *prefix, struct iphdr *iph, struct cldp_header *cldph) {
-    char src_ip[INET_ADDRSTRLEN], dst_ip[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &iph->saddr, src_ip, INET_ADDRSTRLEN);
-    inet_ntop(AF_INET, &iph->daddr, dst_ip, INET_ADDRSTRLEN);
-    
-    printf("[DEBUG] %s: IP[%s->%s, proto=%d, len=%d] CLDP[type=%d, trans_id=%u]\n",
-           prefix, src_ip, dst_ip, iph->protocol, ntohs(iph->tot_len),
-           cldph->msg_type, ntohs(cldph->trans_id));
-}
-
+// Calculate checksum for the IP header
 uint16_t ip_checksum(void *buf, int len) {
     uint32_t sum = 0;
     uint16_t *ptr = (uint16_t *)buf;
@@ -48,6 +36,17 @@ uint16_t ip_checksum(void *buf, int len) {
     return (uint16_t)(~sum);
 }
 
+// Debug function to print packet details
+void debug_packet(const char *prefix, struct iphdr *iph, struct cldp_header *cldph, const char *payload) {
+    char src_ip[INET_ADDRSTRLEN], dst_ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &iph->saddr, src_ip, INET_ADDRSTRLEN);
+    inet_ntop(AF_INET, &iph->daddr, dst_ip, INET_ADDRSTRLEN);
+    printf("[DEBUG] %s: IP[%s -> %s, proto=%d, len=%d] CLDP[type=%d, trans_id=%u] Payload: %s\n",
+           prefix, src_ip, dst_ip, iph->protocol, ntohs(iph->tot_len),
+           cldph->msg_type, ntohs(cldph->trans_id), payload);
+}
+
+// Get the non-loopback local IP address
 char *get_local_ip() {
     struct ifaddrs *ifaddr, *ifa;
     static char ip[INET_ADDRSTRLEN] = "0.0.0.0";
@@ -59,7 +58,8 @@ char *get_local_ip() {
         if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
             struct sockaddr_in *sa = (struct sockaddr_in *)ifa->ifa_addr;
             inet_ntop(AF_INET, &(sa->sin_addr), ip, INET_ADDRSTRLEN);
-            if (strcmp(ifa->ifa_name, "lo") != 0) break;
+            if (strcmp(ifa->ifa_name, "lo") != 0)
+                break;
         }
     }
     freeifaddrs(ifaddr);
@@ -70,40 +70,43 @@ int main() {
     int sock = socket(AF_INET, SOCK_RAW, PROTOCOL_NUM);
     if (sock < 0) {
         perror("Socket creation failed");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
-
+    
     int opt = 1;
     if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &opt, sizeof(opt)) < 0) {
         perror("setsockopt IP_HDRINCL failed");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
-    
     if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &opt, sizeof(opt)) < 0) {
         perror("setsockopt SO_BROADCAST failed");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
-
+    
+    // Broadcast destination address
     struct sockaddr_in dest_addr = {
         .sin_family = AF_INET,
-        .sin_port = 0,  // Not needed for raw socket
+        .sin_port = 0,
         .sin_addr.s_addr = inet_addr("255.255.255.255")
     };
-
+    
     char buffer[BUFFER_SIZE];
     time_t last_hello = 0;
     char *local_ip = get_local_ip();
+    
     printf("Server IP: %s\n", local_ip);
     printf("Server started. Listening for CLDP packets on protocol %d...\n", PROTOCOL_NUM);
-
+    
     while (1) {
         time_t now = time(NULL);
         
         // Send HELLO broadcast every HELLO_INTERVAL seconds
         if (now - last_hello >= HELLO_INTERVAL) {
             struct iphdr iph = {0};
-            uint16_t trans_id = htons(rand() % 65535);  // Convert to network byte order
-            struct cldp_header cldp = {0x01, 0, trans_id, 0};
+            uint16_t trans_id = htons(rand() % 65535);
+            struct cldp_header cldp = {0x01, 0, trans_id, 0};  // HELLO message (msg_type 0x01)
+            // The HELLO payload contains the node's identifier string.
+            char hello_payload[] = "CS39006: Networks Laboratory Semester-Spring 2024-25";
             
             iph.version = 4;
             iph.ihl = 5;
@@ -111,82 +114,83 @@ int main() {
             iph.tos = 0;
             iph.id = htons(rand() % 65535);
             iph.frag_off = 0;
-            iph.tot_len = htons(sizeof(iph) + sizeof(cldp));
+            iph.tot_len = htons(sizeof(iph) + sizeof(cldp) + sizeof(hello_payload));
             iph.protocol = PROTOCOL_NUM;
             iph.saddr = inet_addr(local_ip);
             iph.daddr = dest_addr.sin_addr.s_addr;
             iph.check = 0;
             iph.check = ip_checksum(&iph, sizeof(iph));
-
+            
             memcpy(buffer, &iph, sizeof(iph));
             memcpy(buffer + sizeof(iph), &cldp, sizeof(cldp));
+            memcpy(buffer + sizeof(iph) + sizeof(cldp), hello_payload, sizeof(hello_payload));
             
-            debug_packet("HELLO_OUT", &iph, &cldp);
+            debug_packet("HELLO_OUT", &iph, &cldp, hello_payload);
             
-            int broadcast_result = sendto(sock, buffer, ntohs(iph.tot_len), 0, 
-                                        (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-            
-            if (broadcast_result < 0) {
+            int broadcast_result = sendto(sock, buffer, ntohs(iph.tot_len), 0,
+                                          (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+            if (broadcast_result < 0)
                 perror("Failed to send HELLO broadcast");
-            } else {
+            else
                 printf("Sent HELLO (Trans ID: %u) - %d bytes\n", ntohs(trans_id), broadcast_result);
-            }
             
             last_hello = now;
         }
-
-        // Set up select to avoid blocking
+        
+        // Use select() to allow non-blocking reception
         fd_set readfds;
         struct timeval tv;
         FD_ZERO(&readfds);
         FD_SET(sock, &readfds);
         tv.tv_sec = 0;
-        tv.tv_usec = 100000;  // 100ms
+        tv.tv_usec = 100000;  // 100ms timeout
         
-        if (select(sock + 1, &readfds, NULL, NULL, &tv) <= 0) {
-            continue;  // No data available, check again
-        }
-
-        // Process incoming packets
+        if (select(sock + 1, &readfds, NULL, NULL, &tv) <= 0)
+            continue;
+        
         int len = recvfrom(sock, buffer, BUFFER_SIZE, 0, NULL, NULL);
         if (len > 0) {
             struct iphdr *iph_rx = (struct iphdr *)buffer;
             if (iph_rx->protocol == PROTOCOL_NUM) {
                 struct cldp_header *cldp_rx = (struct cldp_header *)(buffer + sizeof(*iph_rx));
+                int payload_offset = sizeof(*iph_rx) + sizeof(*cldp_rx);
+                int pay_len = ntohs(iph_rx->tot_len) - payload_offset;
+                char received_payload[BUFFER_SIZE];
+                if (pay_len > 0 && pay_len < BUFFER_SIZE) {
+                    memcpy(received_payload, buffer + payload_offset, pay_len);
+                    received_payload[pay_len - 1] = '\0';
+                } else {
+                    received_payload[0] = '\0';
+                }
+                debug_packet("PACKET_IN", iph_rx, cldp_rx, received_payload);
                 
-                debug_packet("PACKET_IN", iph_rx, cldp_rx);
-                
-                // Only respond to QUERY messages
+                // Process QUERY messages (msg_type 0x02)
                 if (cldp_rx->msg_type == 0x02) {
                     char src_ip[INET_ADDRSTRLEN];
                     inet_ntop(AF_INET, &iph_rx->saddr, src_ip, INET_ADDRSTRLEN);
+                    
                     uint8_t *payload_rx = (uint8_t *)(buffer + sizeof(*iph_rx) + sizeof(*cldp_rx));
-                    printf("Received QUERY from %s (Type: %d, Trans ID: %u)\n", 
+                    printf("Received QUERY from %s (Query Type: %d, Trans ID: %u)\n",
                            src_ip, payload_rx[0], ntohs(cldp_rx->trans_id));
                     
+                    // Prepare RESPONSE (msg_type 0x03)
                     struct iphdr iph_tx = {0};
-                    struct cldp_header cldp_tx = {0x03, 0, cldp_rx->trans_id, 0};  // Keep same transaction ID
+                    struct cldp_header cldp_tx = {0x03, 0, cldp_rx->trans_id, 0};
                     char tx_buffer[BUFFER_SIZE];
-                    char response_data[256] = "N/A";
-
-                    // Prepare response based on query type
-                    if (payload_rx[0] == 0x01) {
+                    char response_data[256] = "";
+                    
+                    // For Query type 1: hostname, Query type 2: timestamp.
+                    if (payload_rx[0] == 0x01)
                         gethostname(response_data, sizeof(response_data));
-                    } else if (payload_rx[0] == 0x02) {
+                    else if (payload_rx[0] == 0x02) {
                         struct timeval tv;
                         gettimeofday(&tv, NULL);
                         snprintf(response_data, sizeof(response_data), "%ld.%06ld", tv.tv_sec, tv.tv_usec);
-                    } else if (payload_rx[0] == 0x03) {
-                        FILE *fp = popen("uptime | awk '{print $10}'", "r");
-                        if (fp) {
-                            fgets(response_data, sizeof(response_data), fp);
-                            pclose(fp);
-                            response_data[strcspn(response_data, "\n")] = 0;
-                        }
                     }
-
-                    cldp_tx.payload_len = strlen(response_data) + 1;
+                    else
+                        snprintf(response_data, sizeof(response_data), "Unsupported Query");
                     
+                    cldp_tx.payload_len = strlen(response_data) + 1;
                     iph_tx.version = 4;
                     iph_tx.ihl = 5;
                     iph_tx.ttl = 64;
@@ -199,33 +203,31 @@ int main() {
                     iph_tx.daddr = iph_rx->saddr;
                     iph_tx.check = 0;
                     iph_tx.check = ip_checksum(&iph_tx, sizeof(iph_tx));
-
+                    
                     memcpy(tx_buffer, &iph_tx, sizeof(iph_tx));
                     memcpy(tx_buffer + sizeof(iph_tx), &cldp_tx, sizeof(cldp_tx));
                     memcpy(tx_buffer + sizeof(iph_tx) + sizeof(cldp_tx), response_data, cldp_tx.payload_len);
-
-                    debug_packet("RESPONSE_OUT", &iph_tx, &cldp_tx);
                     
-                    struct sockaddr_in reply_addr = { 
-                        .sin_family = AF_INET, 
+                    debug_packet("RESPONSE_OUT", &iph_tx, &cldp_tx, response_data);
+                    
+                    struct sockaddr_in reply_addr = {
+                        .sin_family = AF_INET,
                         .sin_port = 0,
-                        .sin_addr.s_addr = iph_rx->saddr 
+                        .sin_addr.s_addr = iph_rx->saddr
                     };
                     
-                    int send_result = sendto(sock, tx_buffer, ntohs(iph_tx.tot_len), 0, 
-                                          (struct sockaddr *)&reply_addr, sizeof(reply_addr));
-                    
-                    if (send_result < 0) {
+                    int send_result = sendto(sock, tx_buffer, ntohs(iph_tx.tot_len), 0,
+                                               (struct sockaddr *)&reply_addr, sizeof(reply_addr));
+                    if (send_result < 0)
                         perror("Failed to send RESPONSE");
-                    } else {
-                        printf("Sent RESPONSE (Type: %d, Data: %s, Trans ID: %u)\n", 
+                    else
+                        printf("Sent RESPONSE (Query Type: %d, Data: %s, Trans ID: %u)\n",
                                payload_rx[0], response_data, ntohs(cldp_rx->trans_id));
-                    }
                 }
             }
         }
     }
-
+    
     close(sock);
     return 0;
 }
