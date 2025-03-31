@@ -1,3 +1,9 @@
+// =====================================
+// Assignment 7 Submission
+// Name: Dadi Sasank Kumar
+// Roll number: 22CS10020
+// =====================================
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
