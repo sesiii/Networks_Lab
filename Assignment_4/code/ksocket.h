@@ -19,7 +19,7 @@
 #define PORT_USER1 12345
 #define PORT_USER2 54321
 #define T 5          
-#define P 0.1        
+#define P 0       
 
 #define ENOSPACE -1
 #define ENOTBOUND -2
