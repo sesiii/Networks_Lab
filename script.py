@@ -612,23 +612,23 @@ def run_git_command(command, cwd=None):
     return subprocess.run(command, capture_output=True, text=True, cwd=cwd or DIRECTORY)
 
 def get_untracked_files():
-    """Get a list of untracked (new) files, excluding env/ directory"""
+    """Get a list of untracked (new) files, excluding env/ directory and script.py"""
     result = run_git_command(["git", "ls-files", "--others", "--exclude-standard"])
-    files = [f for f in result.stdout.splitlines() if not f.startswith("env/")]
+    files = [f for f in result.stdout.splitlines() if not f.startswith("env/") and f != "script.py"]
     print(f"Untracked files: {files}")
     return files
 
 def get_modified_files():
-    """Get a list of modified files"""
+    """Get a list of modified files, excluding script.py"""
     result = run_git_command(["git", "status", "--porcelain"])
-    files = [line.split()[-1] for line in result.stdout.splitlines() if line.startswith(" M ")]
+    files = [line.split()[-1] for line in result.stdout.splitlines() if line.startswith(" M ") and line.split()[-1] != "script.py"]
     print(f"Modified files: {files}")
     return files
 
 def get_deleted_files():
-    """Get a list of deleted files"""
+    """Get a list of deleted files, excluding script.py"""
     result = run_git_command(["git", "status", "--porcelain"])
-    files = [line.split()[-1] for line in result.stdout.splitlines() if line.startswith(" D ")]
+    files = [line.split()[-1] for line in result.stdout.splitlines() if line.startswith(" D ") and line.split()[-1] != "script.py"]
     print(f"Deleted files: {files}")
     return files
 
