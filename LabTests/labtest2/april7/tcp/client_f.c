@@ -35,14 +35,16 @@ int main()
     int a=rand()%100, b=rand()%100;
     int sum_;
     char inte[10];
-    printf("a\n");
+    // printf("a\n");
     write(sock_fd,&a,sizeof(int));
     int n=read(sock_fd,buffer,BUFFER_SIZE);
     buffer[n]='\0';
-    printf("b\n");
+    // sleep(1);
+    // printf("b\n");
     write(sock_fd,&b,sizeof(int));
     int m=read(sock_fd,buffer,BUFFER_SIZE);
     buffer[m]='\0';
+    // sleep(1);
     printf("Waiting for sum of numbers %d and %d\n",a,b);
     int o=read(sock_fd,&sum_,sizeof(int));
     printf("Received: %d\n",sum_);
