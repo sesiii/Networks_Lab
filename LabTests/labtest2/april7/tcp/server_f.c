@@ -16,9 +16,11 @@ void handle_client(int client_sock,char *client_ip,int client_port){
     int a_,b_;
     int a=read(client_sock,&a_,sizeof(int));
     printf("Received from %s:%d--> %d\n",client_ip,client_port,a_);
+    sleep(1);
     write(client_sock,"ACK",3);
     int b=read(client_sock,&b_,sizeof(int));
     printf("Received from %s:%d--> %d\n",client_ip,client_port,b_);
+    sleep(1);
     write(client_sock,"ACK",3);
     int c=su(a_,b_);
     printf("%d\n",c);
