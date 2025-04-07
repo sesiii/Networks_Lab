@@ -1,84 +1,3 @@
-// #include<stdio.h>
-// #include<stdlib.h>
-// #include<string.h>
-// #include<unistd.h>
-// #include<arpa/inet.h>
-// #include<signal.h>
-
-// #define port 8080
-// #define BUFFER_SIZE 1024
-
-// void handle_client(int client_sock,char *client_ip,int client_port){
-//     while(1){
-
-//         char buffer[BUFFER_SIZE];
-//         int n=read(client_sock,buffer,BUFFER_SIZE);
-//         buffer[n]='\0';
-//         char ct[1000];
-//         sprintf(ct,"Recieved from %s:%d-->%s",client_ip,client_port,buffer);
-//         printf("%s",ct);
-//         if(strcmp(buffer,"EOF")==0){
-//             printf("Exiting....\n");
-//             close(client_sock);
-//             exit(0);
-//         }
-        
-//         write(client_sock,"ACK",3);
-//     }
-// }
-
-// int main()
-// {
-//     int sock_fd=socket(AF_INET,SOCK_STREAM,0);
-//     if(sock_fd<0){
-//         perror("Socket creation failed.\n");
-//         exit(EXIT_FAILURE);
-//     }
-//     char buffer[BUFFER_SIZE];
-//     struct sockaddr_in client_addr,server_addr;
-//     socklen_t addr_len=sizeof(client_addr);
-
-//     signal(SIGCHLD,SIG_IGN);
-//     server_addr.sin_addr.s_addr=INADDR_ANY;
-//     server_addr.sin_family=AF_INET;
-//     server_addr.sin_port=htons(port);
-
-//     if(bind(sock_fd,(struct sockaddr*)&server_addr,sizeof(server_addr))<0){
-//         perror("Bind failed.\n");
-//         exit(EXIT_FAILURE);
-//     }
-//     if(listen(sock_fd,10)<0){
-//         perror("Listen failed.\n");
-//         exit(EXIT_FAILURE);
-//     }
-//     printf("Listening on port %d\n",port);
-//     while(1){
-//         int client_sock=accept(sock_fd,(struct sockaddr*)&client_addr,&addr_len);
-//         if(client_sock<0){
-//             perror("Accept failed.\n");
-//             exit(EXIT_FAILURE);
-//         }
-
-//         char client_ip[1000];
-//         inet_ntop(AF_INET,&client_addr.sin_addr,client_ip,1000);
-//         int client_port=ntohs(client_addr.sin_port);
-//         printf("connection from %s:%d\n",client_ip,client_port);
-
-//         pid_t pid=fork();
-//         if(pid==0){
-//             close(sock_fd);
-//             handle_client(client_sock,client_ip,client_port);
-//         }
-//         else if(pid<0){
-//             close(client_sock);
-//         }
-//     }
-//     close(sock_fd);
-//     return 0;
-    
-// }
-
-
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -115,7 +34,7 @@ int main()
     server_addr.sin_port=htons(port);
 
     if(bind(sock_fd,(struct sockaddr*)&server_addr,sizeof(server_addr))<0){
-        perror("Bind errro.\n");
+        perror("Bind failed.\n");
         exit(EXIT_FAILURE);
     }
 
@@ -142,7 +61,7 @@ int main()
             close(sock_fd);
             handle_client(client_sock,client_ip,client_port);
         }
-        else if(pid>0){
+        else if(pid<0){
             close(sock_fd);
         }
         else{
